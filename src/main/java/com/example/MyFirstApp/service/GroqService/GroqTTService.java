@@ -1,5 +1,6 @@
 package com.example.MyFirstApp.service.GroqService;
 
+import com.example.MyFirstApp.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -28,6 +29,11 @@ public class GroqTTService {
 
     private final WebClient webClient;
 
+    // =========================================================
+    // CLOUDINARY
+    // =========================================================
+
+    private final CloudinaryService cloudinaryService;
 
     // =========================================================
     // GROQ API KEY
@@ -36,14 +42,12 @@ public class GroqTTService {
     @Value("${GROQ_APIKEY}")
     private String apiKey;
 
-
     // =========================================================
     // AUDIO UPLOAD PATH
     // =========================================================
 
     @Value("${audio.upload.path}")
     private String uploadPath;
-
 
     // =========================================================
     // GROQ TTS URL
@@ -52,7 +56,6 @@ public class GroqTTService {
     private static final String TTS_URL =
             "https://api.groq.com/openai/v1/audio/speech";
 
-
     // =========================================================
     // MODEL
     // =========================================================
@@ -60,14 +63,12 @@ public class GroqTTService {
     private static final String MODEL =
             "canopylabs/orpheus-v1-english";
 
-
     // =========================================================
     // VOICE
     // =========================================================
 
     private static final String VOICE =
             "hannah";
-
 
     // =========================================================
     // NORMAL SINGLE TTS
@@ -141,7 +142,6 @@ public class GroqTTService {
         }
     }
 
-
     // =========================================================
     // OLD COMPATIBLE METHOD
     // =========================================================
@@ -167,20 +167,19 @@ public class GroqTTService {
                     System.out.println(
                             "✅ GROQ TTS COMPLETED"
                     );
+
                 },
 
                 onError
         );
     }
 
-
     // =========================================================
     // OLD CALLBACK METHOD
     //
-    // IMPORTANT:
     // Method name remains same so existing code does not break.
     //
-    // BUT internally it now generates ONE COMPLETE AUDIO FILE.
+    // Internally generates ONE COMPLETE AUDIO FILE.
     // =========================================================
 
     public Disposable generateSpeechChunks(
@@ -212,6 +211,7 @@ public class GroqTTService {
                                 audioUrl
                         );
                     }
+
                 },
 
                 onComplete,
@@ -220,31 +220,10 @@ public class GroqTTService {
         );
     }
 
-
     // =========================================================
     // MAIN TTS METHOD
     //
-    // IMPORTANT:
-    //
-    // Previously:
-    //
-    // full text
-    //    ↓
-    // chunk 1
-    // chunk 2
-    // chunk 3
-    //    ↓
-    // multiple MP3
-    //
-    // NOW:
-    //
-    // full text
-    //    ↓
-    // ONE TTS REQUEST
-    //    ↓
-    // ONE MP3
-    //
-    // This removes audio gaps between chunks.
+    // ONE COMPLETE AUDIO FILE
     // =========================================================
 
     public Disposable generateSpeechChunksWithText(
@@ -264,7 +243,6 @@ public class GroqTTService {
 
         AtomicReference<Disposable> activeDisposable =
                 new AtomicReference<>();
-
 
         // =====================================================
         // PUBLIC DISPOSABLE
@@ -299,14 +277,12 @@ public class GroqTTService {
                         }
                     }
 
-
                     @Override
                     public boolean isDisposed() {
 
                         return cancelled.get();
                     }
                 };
-
 
         try {
 
@@ -334,7 +310,6 @@ public class GroqTTService {
                 return publicDisposable;
             }
 
-
             // =================================================
             // DIRECTORY
             // =================================================
@@ -346,14 +321,12 @@ public class GroqTTService {
                     audioDirectory
             );
 
-
             // =================================================
             // CLEAN TEXT
             // =================================================
 
             String cleanText =
                     cleanText(text);
-
 
             // =================================================
             // LOG
@@ -385,26 +358,31 @@ public class GroqTTService {
             );
 
             System.out.println(
+                    "STORAGE: CLOUDINARY"
+            );
+
+            System.out.println(
                     "========================================"
             );
 
-
             // =================================================
-            // GENERATE ONE AUDIO FILE
+            // GENERATE AUDIO
             // =================================================
 
             Disposable requestDisposable =
                     generateSingleAudioReactive(
                             cleanText
                     )
+
                             .subscribeOn(
                                     Schedulers.boundedElastic()
                             )
+
                             .subscribe(
 
-                                    // =========================
+                                    // =================================
                                     // SUCCESS
-                                    // =========================
+                                    // =================================
 
                                     audioUrl -> {
 
@@ -418,7 +396,6 @@ public class GroqTTService {
 
                                             return;
                                         }
-
 
                                         if (
                                                 audioUrl == null ||
@@ -442,7 +419,6 @@ public class GroqTTService {
                                             return;
                                         }
 
-
                                         System.out.println(
                                                 "========================================"
                                         );
@@ -453,6 +429,10 @@ public class GroqTTService {
 
                                         System.out.println(
                                                 "MODE: SINGLE AUDIO"
+                                        );
+
+                                        System.out.println(
+                                                "STORAGE: CLOUDINARY"
                                         );
 
                                         System.out.println(
@@ -481,9 +461,8 @@ public class GroqTTService {
                                                 "========================================"
                                         );
 
-
                                         // =========================
-                                        // SEND FULL TEXT + ONE AUDIO
+                                        // CALLBACK
                                         // =========================
 
                                         if (
@@ -508,7 +487,6 @@ public class GroqTTService {
                                             }
                                         }
 
-
                                         // =========================
                                         // COMPLETE
                                         // =========================
@@ -532,13 +510,11 @@ public class GroqTTService {
                                                 );
                                             }
                                         }
-
                                     },
 
-
-                                    // =========================
+                                    // =================================
                                     // ERROR
-                                    // =========================
+                                    // =================================
 
                                     error -> {
 
@@ -548,7 +524,6 @@ public class GroqTTService {
 
                                             return;
                                         }
-
 
                                         System.err.println(
                                                 "========================================"
@@ -568,7 +543,6 @@ public class GroqTTService {
                                                 "========================================"
                                         );
 
-
                                         if (
                                                 onError != null
                                         ) {
@@ -584,11 +558,9 @@ public class GroqTTService {
                                     }
                             );
 
-
             activeDisposable.set(
                     requestDisposable
             );
-
 
             // =================================================
             // RACE CONDITION
@@ -600,7 +572,6 @@ public class GroqTTService {
 
                 requestDisposable.dispose();
             }
-
 
         } catch (Exception e) {
 
@@ -618,10 +589,8 @@ public class GroqTTService {
             }
         }
 
-
         return publicDisposable;
     }
-
 
     // =========================================================
     // GENERATE SINGLE AUDIO
@@ -655,7 +624,6 @@ public class GroqTTService {
         }
     }
 
-
     // =========================================================
     // REACTIVE TTS REQUEST
     // =========================================================
@@ -666,6 +634,7 @@ public class GroqTTService {
 
         return webClient
                 .post()
+
                 .uri(TTS_URL)
 
                 .header(
@@ -726,16 +695,24 @@ public class GroqTTService {
                 );
     }
 
-
     // =========================================================
     // SAVE AUDIO
+    //
+    // WAV -> MP3 -> CLOUDINARY
     // =========================================================
 
     private String saveAudioFile(
             byte[] audioBytes
     ) {
 
+        Path wavPath = null;
+        Path mp3Path = null;
+
         try {
+
+            // =================================================
+            // VALIDATE AUDIO
+            // =================================================
 
             if (
                     audioBytes == null ||
@@ -747,6 +724,9 @@ public class GroqTTService {
                 );
             }
 
+            // =================================================
+            // DIRECTORY
+            // =================================================
 
             Path audioDirectory =
                     Paths.get(uploadPath);
@@ -755,31 +735,29 @@ public class GroqTTService {
                     audioDirectory
             );
 
+            // =================================================
+            // FILE NAMES
+            // =================================================
 
             String fileId =
                     UUID.randomUUID()
                             .toString();
 
-
             String wavFileName =
-                    fileId + ".wav";
-
+                    "voice_" + fileId + ".wav";
 
             String mp3FileName =
-                    fileId + ".mp3";
+                    "voice_" + fileId + ".mp3";
 
-
-            Path wavPath =
+            wavPath =
                     audioDirectory.resolve(
                             wavFileName
                     );
 
-
-            Path mp3Path =
+            mp3Path =
                     audioDirectory.resolve(
                             mp3FileName
                     );
-
 
             // =================================================
             // SAVE WAV
@@ -790,12 +768,10 @@ public class GroqTTService {
                     audioBytes
             );
 
-
             System.out.println(
                     "💾 GROQ WAV SAVED: "
                             + wavPath.toAbsolutePath()
             );
-
 
             // =================================================
             // FFMPEG WAV -> MP3
@@ -804,7 +780,6 @@ public class GroqTTService {
             System.out.println(
                     "🎵 STARTING FFMPEG WAV -> MP3"
             );
-
 
             ProcessBuilder processBuilder =
                     new ProcessBuilder(
@@ -838,14 +813,11 @@ public class GroqTTService {
                                     .toString()
                     );
 
-
             Process process =
                     processBuilder.start();
 
-
             int exitCode =
                     process.waitFor();
-
 
             if (
                     exitCode != 0
@@ -856,7 +828,6 @@ public class GroqTTService {
                                 + exitCode
                 );
             }
-
 
             // =================================================
             // VERIFY MP3
@@ -873,12 +844,10 @@ public class GroqTTService {
                 );
             }
 
-
             long mp3Size =
                     Files.size(
                             mp3Path
                     );
-
 
             if (
                     mp3Size <= 0
@@ -888,7 +857,6 @@ public class GroqTTService {
                         "Generated MP3 file is empty"
                 );
             }
-
 
             System.out.println(
                     "✅ FFMPEG WAV -> MP3 SUCCESS"
@@ -900,15 +868,54 @@ public class GroqTTService {
                             + " bytes"
             );
 
+            // =================================================
+            // UPLOAD MP3 TO CLOUDINARY
+            // =================================================
+
+            System.out.println(
+                    "☁️ UPLOADING VOICE AUDIO TO CLOUDINARY"
+            );
+
+            String cloudinaryUrl =
+                    cloudinaryService.uploadAudio(
+                            mp3Path.toFile()
+                    );
 
             // =================================================
-            // DELETE WAV
+            // VERIFY CLOUDINARY URL
+            // =================================================
+
+            if (
+                    cloudinaryUrl == null ||
+                            cloudinaryUrl.isBlank()
+            ) {
+
+                throw new RuntimeException(
+                        "Cloudinary returned empty audio URL"
+                );
+            }
+
+            System.out.println(
+                    "✅ CLOUDINARY AUDIO UPLOAD SUCCESS"
+            );
+
+            System.out.println(
+                    "CLOUDINARY URL: "
+                            + cloudinaryUrl
+            );
+
+            // =================================================
+            // DELETE LOCAL WAV
             // =================================================
 
             try {
 
                 Files.deleteIfExists(
                         wavPath
+                );
+
+                System.out.println(
+                        "🗑️ TEMP WAV DELETED"
                 );
 
             } catch (Exception e) {
@@ -919,35 +926,74 @@ public class GroqTTService {
                 );
             }
 
+            // =================================================
+            // DELETE LOCAL MP3
+            // =================================================
+
+            try {
+
+                Files.deleteIfExists(
+                        mp3Path
+                );
+
+                System.out.println(
+                        "🗑️ TEMP MP3 DELETED"
+                );
+
+            } catch (Exception e) {
+
+                System.err.println(
+                        "⚠️ MP3 DELETE FAILED: "
+                                + e.getMessage()
+                );
+            }
 
             // =================================================
-            // AUDIO URL
+            // RETURN CLOUDINARY URL
             // =================================================
 
-            String audioUrl =
-                    "http://10.43.245.75:8080"
-                            + "/api/v1.0/audio/"
-                            + mp3FileName;
-
-
-            System.out.println(
-                    "🔊 GROQ FULL MP3 AUDIO URL: "
-                            + audioUrl
-            );
-
-
-            return audioUrl;
-
+            return cloudinaryUrl;
 
         } catch (Exception e) {
 
+            // =================================================
+            // CLEANUP ON FAILURE
+            // =================================================
+
+            if (
+                    wavPath != null
+            ) {
+
+                try {
+
+                    Files.deleteIfExists(
+                            wavPath
+                    );
+
+                } catch (Exception ignored) {
+                }
+            }
+
+            if (
+                    mp3Path != null
+            ) {
+
+                try {
+
+                    Files.deleteIfExists(
+                            mp3Path
+                    );
+
+                } catch (Exception ignored) {
+                }
+            }
+
             throw new RuntimeException(
-                    "Unable to save Groq TTS audio",
+                    "Unable to generate/upload Groq TTS audio",
                     e
             );
         }
     }
-
 
     // =========================================================
     // CLEAN TEXT
@@ -965,21 +1011,24 @@ public class GroqTTService {
         }
 
         return text
+
                 .replace(
                         "\n",
                         " "
                 )
+
                 .replace(
                         "\r",
                         " "
                 )
+
                 .replaceAll(
                         "\\s+",
                         " "
                 )
+
                 .trim();
     }
-
 
     // =========================================================
     // REQUEST DTO
