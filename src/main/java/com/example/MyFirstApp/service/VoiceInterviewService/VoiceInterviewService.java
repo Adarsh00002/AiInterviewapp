@@ -61,6 +61,8 @@ public class VoiceInterviewService {
 
         VoiceInterviewSession session =
                 VoiceInterviewSession.builder()
+                        .userId(request.getUserId())
+
                         .totalExperience(
                                 request.getTotalExperience()
                         )
@@ -77,18 +79,14 @@ public class VoiceInterviewService {
                                 request.getInterviewStyle()
                         )
 
-                        // First question
                         .currentQuestionNumber(1)
 
                         .currentQuestion(null)
 
-                        // Scores
                         .totalScore(0)
 
-                        // Status
                         .completed(false)
 
-                        // Time
                         .startedAt(
                                 LocalDateTime.now()
                         )
