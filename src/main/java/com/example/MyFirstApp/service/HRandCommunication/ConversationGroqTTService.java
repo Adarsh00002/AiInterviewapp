@@ -1,5 +1,6 @@
 package com.example.MyFirstApp.service.HRandCommunication;
 
+import com.example.MyFirstApp.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -9,6 +10,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -22,8 +24,9 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class ConversationGroqTTService {
 
-
     private final WebClient webClient;
+
+    private final CloudinaryService cloudinaryService;
 
 
     // =========================================================
@@ -35,19 +38,11 @@ public class ConversationGroqTTService {
 
 
     // =========================================================
-    // AUDIO UPLOAD PATH
+    // AUDIO TEMP UPLOAD PATH
     // =========================================================
 
     @Value("${audio.upload.path}")
     private String uploadPath;
-
-
-    // =========================================================
-    // SERVER URL
-    // =========================================================
-
-    @Value("${app.base-url:http://192.168.43.75:8080}")
-    private String baseUrl;
 
 
     // =========================================================
@@ -70,15 +65,17 @@ public class ConversationGroqTTService {
     // GENERATE COMPLETE AUDIO
     // =========================================================
     //
-    // FULL TEXT
-    //      ↓
-    // ONE GROQ REQUEST
-    //      ↓
+    // TEXT
+    //   ↓
+    // GROQ TTS
+    //   ↓
     // WAV
-    //      ↓
+    //   ↓
     // MP3
-    //      ↓
-    // audioUrl
+    //   ↓
+    // CLOUDINARY
+    //   ↓
+    // HTTPS AUDIO URL
     //
     // =========================================================
 
@@ -93,7 +90,6 @@ public class ConversationGroqTTService {
             Consumer<Throwable> onError
 
     ) {
-
 
         AtomicBoolean cancelled =
                 new AtomicBoolean(false);
@@ -113,13 +109,10 @@ public class ConversationGroqTTService {
                     @Override
                     public void dispose() {
 
-                        if (
-                                !cancelled.compareAndSet(
-                                        false,
-                                        true
-                                )
-                        ) {
-
+                        if (!cancelled.compareAndSet(
+                                false,
+                                true
+                        )) {
                             return;
                         }
 
@@ -133,10 +126,7 @@ public class ConversationGroqTTService {
                                 activeDisposable.get();
 
 
-                        if (
-                                current != null
-                        ) {
-
+                        if (current != null) {
                             current.dispose();
                         }
                     }
@@ -154,10 +144,7 @@ public class ConversationGroqTTService {
         // VALIDATE TEXT
         // =====================================================
 
-        if (
-                text == null ||
-                        text.isBlank()
-        ) {
+        if (text == null || text.isBlank()) {
 
             RuntimeException error =
                     new IllegalArgumentException(
@@ -165,13 +152,8 @@ public class ConversationGroqTTService {
                     );
 
 
-            if (
-                    onError != null
-            ) {
-
-                onError.accept(
-                        error
-                );
+            if (onError != null) {
+                onError.accept(error);
             }
 
 
@@ -184,37 +166,32 @@ public class ConversationGroqTTService {
         // =====================================================
 
         String cleanText =
-                cleanText(
-                        text
-                );
+                cleanText(text);
 
 
         // =====================================================
-        // CREATE DIRECTORY
+        // CREATE TEMP DIRECTORY
         // =====================================================
 
         try {
 
             Files.createDirectories(
-                    Paths.get(
-                            uploadPath
-                    )
+                    Paths.get(uploadPath)
             );
 
         } catch (Exception e) {
 
-            if (
-                    onError != null
-            ) {
-
-                onError.accept(
-                        e
-                );
+            if (onError != null) {
+                onError.accept(e);
             }
 
             return publicDisposable;
         }
 
+
+        // =====================================================
+        // LOG
+        // =====================================================
 
         System.out.println(
                 "========================================"
@@ -225,13 +202,11 @@ public class ConversationGroqTTService {
         );
 
         System.out.println(
-                "MODEL: "
-                        + MODEL
+                "MODEL: " + MODEL
         );
 
         System.out.println(
-                "VOICE: "
-                        + VOICE
+                "VOICE: " + VOICE
         );
 
         System.out.println(
@@ -239,8 +214,7 @@ public class ConversationGroqTTService {
         );
 
         System.out.println(
-                "TEXT LENGTH: "
-                        + cleanText.length()
+                "TEXT LENGTH: " + cleanText.length()
         );
 
         System.out.println(
@@ -253,12 +227,12 @@ public class ConversationGroqTTService {
         // =====================================================
 
         Disposable requestDisposable =
-                generateAudio(
-                        cleanText
-                )
+                generateAudio(cleanText)
+
                         .subscribeOn(
                                 Schedulers.boundedElastic()
                         )
+
                         .subscribe(
 
                                 // =================================
@@ -267,9 +241,7 @@ public class ConversationGroqTTService {
 
                                 audioUrl -> {
 
-                                    if (
-                                            cancelled.get()
-                                    ) {
+                                    if (cancelled.get()) {
 
                                         System.out.println(
                                                 "🚫 IGNORING TTS RESULT - CANCELLED"
@@ -290,13 +262,8 @@ public class ConversationGroqTTService {
                                                 );
 
 
-                                        if (
-                                                onError != null
-                                        ) {
-
-                                            onError.accept(
-                                                    error
-                                            );
+                                        if (onError != null) {
+                                            onError.accept(error);
                                         }
 
                                         return;
@@ -308,17 +275,15 @@ public class ConversationGroqTTService {
                                     );
 
                                     System.out.println(
-                                            "✅ CONVERSATION FULL AUDIO READY"
+                                            "✅ CONVERSATION CLOUDINARY AUDIO READY"
                                     );
 
                                     System.out.println(
-                                            "AUDIO URL: "
-                                                    + audioUrl
+                                            "AUDIO URL: " + audioUrl
                                     );
 
                                     System.out.println(
-                                            "TEXT: "
-                                                    + cleanText
+                                            "TEXT: " + cleanText
                                     );
 
                                     System.out.println(
@@ -330,9 +295,7 @@ public class ConversationGroqTTService {
                                     // AI AUDIO CALLBACK
                                     // =================================
 
-                                    if (
-                                            onAudioReady != null
-                                    ) {
+                                    if (onAudioReady != null) {
 
                                         try {
 
@@ -341,9 +304,7 @@ public class ConversationGroqTTService {
                                                     audioUrl
                                             );
 
-                                        } catch (
-                                                Exception callbackError
-                                        ) {
+                                        } catch (Exception callbackError) {
 
                                             System.err.println(
                                                     "❌ CONVERSATION TTS CALLBACK ERROR: "
@@ -366,9 +327,7 @@ public class ConversationGroqTTService {
 
                                             onComplete.run();
 
-                                        } catch (
-                                                Exception callbackError
-                                        ) {
+                                        } catch (Exception callbackError) {
 
                                             System.err.println(
                                                     "❌ CONVERSATION TTS COMPLETE CALLBACK ERROR: "
@@ -386,10 +345,7 @@ public class ConversationGroqTTService {
 
                                 error -> {
 
-                                    if (
-                                            cancelled.get()
-                                    ) {
-
+                                    if (cancelled.get()) {
                                         return;
                                     }
 
@@ -413,19 +369,13 @@ public class ConversationGroqTTService {
                                     );
 
 
-                                    if (
-                                            onError != null
-                                    ) {
+                                    if (onError != null) {
 
                                         try {
 
-                                            onError.accept(
-                                                    error
-                                            );
+                                            onError.accept(error);
 
-                                        } catch (
-                                                Exception callbackError
-                                        ) {
+                                        } catch (Exception callbackError) {
 
                                             System.err.println(
                                                     "❌ CONVERSATION TTS ERROR CALLBACK ERROR: "
@@ -446,10 +396,7 @@ public class ConversationGroqTTService {
         // RACE CONDITION
         // =====================================================
 
-        if (
-                cancelled.get()
-        ) {
-
+        if (cancelled.get()) {
             requestDisposable.dispose();
         }
 
@@ -467,7 +414,9 @@ public class ConversationGroqTTService {
     ) {
 
         return webClient
+
                 .post()
+
                 .uri(
                         TTS_URL
                 )
@@ -496,15 +445,14 @@ public class ConversationGroqTTService {
                         )
                 )
 
-                .retrieve()
-
                 // =================================================
                 // GROQ ERROR
                 // =================================================
 
+                .retrieve()
+
                 .onStatus(
-                        status ->
-                                status.isError(),
+                        status -> status.isError(),
 
                         response ->
                                 response
@@ -533,7 +481,7 @@ public class ConversationGroqTTService {
                 )
 
                 // =================================================
-                // SAVE WAV + CONVERT MP3
+                // SAVE WAV -> MP3 -> CLOUDINARY
                 // =================================================
 
                 .map(
@@ -543,14 +491,21 @@ public class ConversationGroqTTService {
 
 
     // =========================================================
-    // SAVE WAV → MP3
+    // SAVE WAV -> MP3 -> CLOUDINARY
     // =========================================================
 
     private String saveAudio(
             byte[] bytes
     ) {
 
+        Path wavPath = null;
+        Path mp3Path = null;
+
         try {
+
+            // =================================================
+            // VALIDATE AUDIO
+            // =================================================
 
             if (
                     bytes == null ||
@@ -564,13 +519,11 @@ public class ConversationGroqTTService {
 
 
             // =================================================
-            // DIRECTORY
+            // TEMP DIRECTORY
             // =================================================
 
             Path directory =
-                    Paths.get(
-                            uploadPath
-                    );
+                    Paths.get(uploadPath);
 
 
             Files.createDirectories(
@@ -587,7 +540,7 @@ public class ConversationGroqTTService {
                             .toString();
 
 
-            Path wavPath =
+            wavPath =
                     directory.resolve(
                             "conversation_"
                                     + id
@@ -595,7 +548,7 @@ public class ConversationGroqTTService {
                     );
 
 
-            Path mp3Path =
+            mp3Path =
                     directory.resolve(
                             "conversation_"
                                     + id
@@ -622,8 +575,15 @@ public class ConversationGroqTTService {
             );
 
 
+            System.out.println(
+                    "WAV SIZE: "
+                            + bytes.length
+                            + " bytes"
+            );
+
+
             // =================================================
-            // WAV → MP3
+            // WAV -> MP3
             // =================================================
 
             System.out.println(
@@ -633,9 +593,13 @@ public class ConversationGroqTTService {
 
             Process process =
                     new ProcessBuilder(
+
                             "ffmpeg",
+
                             "-y",
+
                             "-hide_banner",
+
                             "-loglevel",
                             "error",
 
@@ -655,9 +619,11 @@ public class ConversationGroqTTService {
                                     .toAbsolutePath()
                                     .toString()
                     )
+
                             .redirectErrorStream(
                                     true
                             )
+
                             .start();
 
 
@@ -681,8 +647,7 @@ public class ConversationGroqTTService {
                 String line;
 
                 while (
-                        (line =
-                                reader.readLine()) != null
+                        (line = reader.readLine()) != null
                 ) {
 
                     ffmpegOutput
@@ -706,9 +671,7 @@ public class ConversationGroqTTService {
             // CHECK FFMPEG
             // =================================================
 
-            if (
-                    exitCode != 0
-            ) {
+            if (exitCode != 0) {
 
                 throw new RuntimeException(
                         "FFmpeg conversion failed. Exit code="
@@ -723,11 +686,7 @@ public class ConversationGroqTTService {
             // VERIFY MP3
             // =================================================
 
-            if (
-                    !Files.exists(
-                            mp3Path
-                    )
-            ) {
+            if (!Files.exists(mp3Path)) {
 
                 throw new RuntimeException(
                         "MP3 file was not created"
@@ -736,14 +695,10 @@ public class ConversationGroqTTService {
 
 
             long mp3Size =
-                    Files.size(
-                            mp3Path
-                    );
+                    Files.size(mp3Path);
 
 
-            if (
-                    mp3Size <= 0
-            ) {
+            if (mp3Size <= 0) {
 
                 throw new RuntimeException(
                         "Generated MP3 file is empty"
@@ -763,7 +718,75 @@ public class ConversationGroqTTService {
 
 
             // =================================================
-            // DELETE WAV
+            // CLOUDINARY UPLOAD
+            // =================================================
+
+            System.out.println(
+                    "========================================"
+            );
+
+            System.out.println(
+                    "☁️ UPLOADING CONVERSATION AUDIO TO CLOUDINARY"
+            );
+
+            System.out.println(
+                    "FILE: "
+                            + mp3Path.toAbsolutePath()
+            );
+
+            System.out.println(
+                    "========================================"
+            );
+
+
+            File mp3File =
+                    mp3Path.toFile();
+
+
+            String cloudinaryAudioUrl =
+                    cloudinaryService.uploadAudio(
+                            mp3File
+                    );
+
+
+            // =================================================
+            // CHECK CLOUDINARY URL
+            // =================================================
+
+            if (
+                    cloudinaryAudioUrl == null ||
+                            cloudinaryAudioUrl.isBlank()
+            ) {
+
+                throw new RuntimeException(
+                        "Cloudinary returned empty audio URL"
+                );
+            }
+
+
+            System.out.println(
+                    "========================================"
+            );
+
+            System.out.println(
+                    "✅ CONVERSATION AUDIO UPLOADED TO CLOUDINARY"
+            );
+
+            System.out.println(
+                    "CLOUDINARY URL:"
+            );
+
+            System.out.println(
+                    cloudinaryAudioUrl
+            );
+
+            System.out.println(
+                    "========================================"
+            );
+
+
+            // =================================================
+            // DELETE TEMP WAV
             // =================================================
 
             try {
@@ -773,54 +796,100 @@ public class ConversationGroqTTService {
                 );
 
                 System.out.println(
-                        "🗑️ CONVERSATION WAV DELETED"
+                        "🗑️ TEMP WAV DELETED"
                 );
 
-            } catch (
-                    Exception e
-            ) {
+            } catch (Exception e) {
 
                 System.err.println(
-                        "⚠️ CONVERSATION WAV DELETE FAILED: "
+                        "⚠️ TEMP WAV DELETE FAILED: "
                                 + e.getMessage()
                 );
             }
 
 
             // =================================================
-            // FINAL AUDIO URL
+            // DELETE TEMP MP3
             // =================================================
 
-            String audioUrl =
-                    baseUrl
-                            + "/api/v1.0/audio/"
-                            + mp3Path
-                            .getFileName()
-                            .toString();
+            try {
+
+                Files.deleteIfExists(
+                        mp3Path
+                );
+
+                System.out.println(
+                        "🗑️ TEMP MP3 DELETED"
+                );
+
+            } catch (Exception e) {
+
+                System.err.println(
+                        "⚠️ TEMP MP3 DELETE FAILED: "
+                                + e.getMessage()
+                );
+            }
 
 
-            System.out.println(
+            // =================================================
+            // RETURN CLOUDINARY URL
+            // =================================================
+
+            return cloudinaryAudioUrl;
+
+        } catch (Exception e) {
+
+            // =================================================
+            // CLEANUP ON ERROR
+            // =================================================
+
+            try {
+
+                if (wavPath != null) {
+                    Files.deleteIfExists(wavPath);
+                }
+
+            } catch (Exception cleanupError) {
+
+                System.err.println(
+                        "⚠️ WAV CLEANUP FAILED: "
+                                + cleanupError.getMessage()
+                );
+            }
+
+
+            try {
+
+                if (mp3Path != null) {
+                    Files.deleteIfExists(mp3Path);
+                }
+
+            } catch (Exception cleanupError) {
+
+                System.err.println(
+                        "⚠️ MP3 CLEANUP FAILED: "
+                                + cleanupError.getMessage()
+                );
+            }
+
+
+            System.err.println(
                     "========================================"
             );
 
-            System.out.println(
-                    "🔊 CONVERSATION MP3 URL:"
+            System.err.println(
+                    "❌ CONVERSATION AUDIO GENERATION FAILED"
             );
 
-            System.out.println(
-                    audioUrl
+            System.err.println(
+                    "MESSAGE: "
+                            + e.getMessage()
             );
 
-            System.out.println(
+            System.err.println(
                     "========================================"
             );
 
-
-            return audioUrl;
-
-        } catch (
-                Exception e
-        ) {
 
             throw new RuntimeException(
                     "Unable to generate Conversation interview audio",
@@ -838,27 +907,28 @@ public class ConversationGroqTTService {
             String text
     ) {
 
-        if (
-                text == null
-        ) {
-
+        if (text == null) {
             return "";
         }
 
 
         return text
+
                 .replace(
                         "\n",
                         " "
                 )
+
                 .replace(
                         "\r",
                         " "
                 )
+
                 .replaceAll(
                         "\\s+",
                         " "
                 )
+
                 .trim();
     }
 

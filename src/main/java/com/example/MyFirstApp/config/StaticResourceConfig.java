@@ -1,4 +1,4 @@
-package com.example.MyFirstApp.config;
+/*package com.example.MyFirstApp.config;
 
 import org.springframework.context.annotation.Configuration;
 
@@ -17,4 +17,3 @@ public class StaticResourceConfig {
      * Therefore no /audio/** static resource mapping
      * is required here.
      */
-}

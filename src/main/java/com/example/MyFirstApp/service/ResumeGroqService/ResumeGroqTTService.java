@@ -1,5 +1,6 @@
 package com.example.MyFirstApp.service.ResumeGroqService;
 
+import com.example.MyFirstApp.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -9,6 +10,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,8 +26,20 @@ public class ResumeGroqTTService {
 
     private final WebClient webClient;
 
+    private final CloudinaryService cloudinaryService;
+
+
+    // =========================================================
+    // GROQ API KEY
+    // =========================================================
+
     @Value("${GROQ_APIKEY}")
     private String apiKey;
+
+
+    // =========================================================
+    // TEMP AUDIO UPLOAD PATH
+    // =========================================================
 
     @Value("${audio.upload.path}")
     private String uploadPath;
@@ -51,19 +65,17 @@ public class ResumeGroqTTService {
     // GENERATE ONE COMPLETE AUDIO
     // =========================================================
     //
-    // IMPORTANT:
-    //
-    // AI response ko split nahi karna.
-    //
     // FULL TEXT
-    //     ↓
-    // ONE GROQ TTS REQUEST
-    //     ↓
-    // ONE WAV
-    //     ↓
-    // ONE MP3
-    //     ↓
-    // ONE audioUrl
+    //      ↓
+    // GROQ TTS
+    //      ↓
+    // WAV
+    //      ↓
+    // MP3
+    //      ↓
+    // CLOUDINARY
+    //      ↓
+    // HTTPS AUDIO URL
     //
     // =========================================================
 
@@ -117,9 +129,7 @@ public class ResumeGroqTTService {
                                 activeDisposable.get();
 
 
-                        if (
-                                current != null
-                        ) {
+                        if (current != null) {
 
                             current.dispose();
                         }
@@ -135,7 +145,7 @@ public class ResumeGroqTTService {
 
 
         // =====================================================
-        // VALIDATION
+        // VALIDATE TEXT
         // =====================================================
 
         if (
@@ -149,9 +159,7 @@ public class ResumeGroqTTService {
                     );
 
 
-            if (
-                    onError != null
-            ) {
+            if (onError != null) {
 
                 onError.accept(
                         error
@@ -173,6 +181,10 @@ public class ResumeGroqTTService {
                 );
 
 
+        // =====================================================
+        // CREATE TEMP DIRECTORY
+        // =====================================================
+
         try {
 
             Files.createDirectories(
@@ -183,9 +195,7 @@ public class ResumeGroqTTService {
 
         } catch (Exception e) {
 
-            if (
-                    onError != null
-            ) {
+            if (onError != null) {
 
                 onError.accept(
                         e
@@ -196,6 +206,10 @@ public class ResumeGroqTTService {
         }
 
 
+        // =====================================================
+        // LOG
+        // =====================================================
+
         System.out.println(
                 "========================================"
         );
@@ -205,13 +219,11 @@ public class ResumeGroqTTService {
         );
 
         System.out.println(
-                "MODEL: "
-                        + MODEL
+                "MODEL: " + MODEL
         );
 
         System.out.println(
-                "VOICE: "
-                        + VOICE
+                "VOICE: " + VOICE
         );
 
         System.out.println(
@@ -219,8 +231,7 @@ public class ResumeGroqTTService {
         );
 
         System.out.println(
-                "TEXT LENGTH: "
-                        + cleanText.length()
+                "TEXT LENGTH: " + cleanText.length()
         );
 
         System.out.println(
@@ -236,9 +247,11 @@ public class ResumeGroqTTService {
                 generateAudio(
                         cleanText
                 )
+
                         .subscribeOn(
                                 Schedulers.boundedElastic()
                         )
+
                         .subscribe(
 
                                 // =================================
@@ -270,9 +283,7 @@ public class ResumeGroqTTService {
                                                 );
 
 
-                                        if (
-                                                onError != null
-                                        ) {
+                                        if (onError != null) {
 
                                             onError.accept(
                                                     error
@@ -283,22 +294,32 @@ public class ResumeGroqTTService {
                                     }
 
 
+                                    // =================================
+                                    // SUCCESS LOG
+                                    // =================================
+
                                     System.out.println(
                                             "========================================"
                                     );
 
                                     System.out.println(
-                                            "✅ RESUME GROQ FULL AUDIO READY"
+                                            "✅ RESUME CLOUDINARY AUDIO READY"
                                     );
 
                                     System.out.println(
-                                            "AUDIO URL: "
-                                                    + audioUrl
+                                            "AUDIO URL:"
                                     );
 
                                     System.out.println(
-                                            "TEXT: "
-                                                    + cleanText
+                                            audioUrl
+                                    );
+
+                                    System.out.println(
+                                            "TEXT:"
+                                    );
+
+                                    System.out.println(
+                                            cleanText
                                     );
 
                                     System.out.println(
@@ -307,7 +328,7 @@ public class ResumeGroqTTService {
 
 
                                     // =================================
-                                    // ONE AI_AUDIO CALLBACK
+                                    // AI AUDIO CALLBACK
                                     // =================================
 
                                     if (
@@ -332,7 +353,7 @@ public class ResumeGroqTTService {
 
 
                                     // =================================
-                                    // GENERATION COMPLETE
+                                    // COMPLETE
                                     // =================================
 
                                     if (
@@ -352,6 +373,7 @@ public class ResumeGroqTTService {
                                             );
                                         }
                                     }
+
                                 },
 
 
@@ -432,7 +454,7 @@ public class ResumeGroqTTService {
 
 
     // =========================================================
-    // SINGLE AUDIO REQUEST
+    // GENERATE AUDIO
     // =========================================================
 
     private Mono<String> generateAudio(
@@ -440,7 +462,9 @@ public class ResumeGroqTTService {
     ) {
 
         return webClient
+
                 .post()
+
                 .uri(
                         TTS_URL
                 )
@@ -476,16 +500,20 @@ public class ResumeGroqTTService {
                 // =================================================
 
                 .onStatus(
+
                         status ->
                                 status.isError(),
 
                         response ->
+
                                 response
                                         .bodyToMono(
                                                 String.class
                                         )
+
                                         .flatMap(
                                                 body ->
+
                                                         Mono.error(
                                                                 new RuntimeException(
                                                                         "Resume TTS HTTP "
@@ -506,7 +534,7 @@ public class ResumeGroqTTService {
                 )
 
                 // =================================================
-                // SAVE AUDIO
+                // WAV -> MP3 -> CLOUDINARY
                 // =================================================
 
                 .map(
@@ -516,14 +544,23 @@ public class ResumeGroqTTService {
 
 
     // =========================================================
-    // SAVE AUDIO
+    // SAVE WAV -> MP3 -> CLOUDINARY
     // =========================================================
 
     private String saveAudio(
             byte[] bytes
     ) {
 
+        Path wavPath = null;
+
+        Path mp3Path = null;
+
+
         try {
+
+            // =================================================
+            // VALIDATE AUDIO
+            // =================================================
 
             if (
                     bytes == null ||
@@ -536,6 +573,10 @@ public class ResumeGroqTTService {
             }
 
 
+            // =================================================
+            // TEMP DIRECTORY
+            // =================================================
+
             Path directory =
                     Paths.get(
                             uploadPath
@@ -547,20 +588,28 @@ public class ResumeGroqTTService {
             );
 
 
+            // =================================================
+            // UNIQUE FILE NAME
+            // =================================================
+
             String id =
                     UUID.randomUUID()
                             .toString();
 
 
-            Path wavPath =
+            wavPath =
                     directory.resolve(
-                            id + ".wav"
+                            "resume_"
+                                    + id
+                                    + ".wav"
                     );
 
 
-            Path mp3Path =
+            mp3Path =
                     directory.resolve(
-                            id + ".mp3"
+                            "resume_"
+                                    + id
+                                    + ".mp3"
                     );
 
 
@@ -575,8 +624,17 @@ public class ResumeGroqTTService {
 
 
             System.out.println(
-                    "💾 RESUME WAV SAVED: "
-                            + wavPath.toAbsolutePath()
+                    "💾 RESUME WAV SAVED:"
+            );
+
+            System.out.println(
+                    wavPath.toAbsolutePath()
+            );
+
+            System.out.println(
+                    "WAV SIZE: "
+                            + bytes.length
+                            + " bytes"
             );
 
 
@@ -591,37 +649,94 @@ public class ResumeGroqTTService {
 
             Process process =
                     new ProcessBuilder(
+
                             "ffmpeg",
+
                             "-y",
+
                             "-hide_banner",
+
                             "-loglevel",
                             "error",
+
                             "-i",
+
                             wavPath
                                     .toAbsolutePath()
                                     .toString(),
+
                             "-codec:a",
                             "libmp3lame",
+
                             "-b:a",
                             "128k",
+
                             mp3Path
                                     .toAbsolutePath()
                                     .toString()
                     )
+
+                            .redirectErrorStream(
+                                    true
+                            )
+
                             .start();
 
+
+            // =================================================
+            // READ FFMPEG OUTPUT
+            // =================================================
+
+            StringBuilder ffmpegOutput =
+                    new StringBuilder();
+
+
+            try (
+                    java.io.BufferedReader reader =
+                            new java.io.BufferedReader(
+                                    new java.io.InputStreamReader(
+                                            process.getInputStream()
+                                    )
+                            )
+            ) {
+
+                String line;
+
+
+                while (
+                        (line = reader.readLine()) != null
+                ) {
+
+                    ffmpegOutput
+                            .append(line)
+                            .append(
+                                    System.lineSeparator()
+                            );
+                }
+            }
+
+
+            // =================================================
+            // WAIT FOR FFMPEG
+            // =================================================
 
             int exitCode =
                     process.waitFor();
 
+
+            // =================================================
+            // CHECK FFMPEG
+            // =================================================
 
             if (
                     exitCode != 0
             ) {
 
                 throw new RuntimeException(
-                        "FFmpeg conversion failed. Exit code: "
+                        "FFmpeg conversion failed. Exit code="
                                 + exitCode
+                                + "\n"
+                                + ffmpegOutput
                 );
             }
 
@@ -663,20 +778,92 @@ public class ResumeGroqTTService {
             );
 
             System.out.println(
-                    "SIZE: "
+                    "MP3 SIZE: "
                             + mp3Size
                             + " bytes"
             );
 
 
             // =================================================
-            // DELETE WAV
+            // CLOUDINARY UPLOAD
+            // =================================================
+
+            System.out.println(
+                    "========================================"
+            );
+
+            System.out.println(
+                    "☁️ UPLOADING RESUME AUDIO TO CLOUDINARY"
+            );
+
+            System.out.println(
+                    "FILE: "
+                            + mp3Path.toAbsolutePath()
+            );
+
+            System.out.println(
+                    "========================================"
+            );
+
+
+            File mp3File =
+                    mp3Path.toFile();
+
+
+            String cloudinaryAudioUrl =
+                    cloudinaryService.uploadAudio(
+                            mp3File
+                    );
+
+
+            // =================================================
+            // VERIFY CLOUDINARY URL
+            // =================================================
+
+            if (
+                    cloudinaryAudioUrl == null ||
+                            cloudinaryAudioUrl.isBlank()
+            ) {
+
+                throw new RuntimeException(
+                        "Cloudinary returned empty audio URL"
+                );
+            }
+
+
+            System.out.println(
+                    "========================================"
+            );
+
+            System.out.println(
+                    "✅ RESUME AUDIO UPLOADED TO CLOUDINARY"
+            );
+
+            System.out.println(
+                    "CLOUDINARY AUDIO URL:"
+            );
+
+            System.out.println(
+                    cloudinaryAudioUrl
+            );
+
+            System.out.println(
+                    "========================================"
+            );
+
+
+            // =================================================
+            // DELETE TEMP WAV
             // =================================================
 
             try {
 
                 Files.deleteIfExists(
                         wavPath
+                );
+
+                System.out.println(
+                        "🗑️ RESUME TEMP WAV DELETED"
                 );
 
             } catch (Exception e) {
@@ -689,28 +876,94 @@ public class ResumeGroqTTService {
 
 
             // =================================================
-            // AUDIO URL
+            // DELETE TEMP MP3
             // =================================================
 
-            String audioUrl =
-                    "http://192.168.43.75:8080"
-                            + "/api/v1.0/audio/"
-                            + mp3Path.getFileName()
-                            .toString();
+            try {
+
+                Files.deleteIfExists(
+                        mp3Path
+                );
+
+                System.out.println(
+                        "🗑️ RESUME TEMP MP3 DELETED"
+                );
+
+            } catch (Exception e) {
+
+                System.err.println(
+                        "⚠️ RESUME MP3 DELETE FAILED: "
+                                + e.getMessage()
+                );
+            }
 
 
-            System.out.println(
-                    "🔊 RESUME FULL AUDIO URL:"
-            );
+            // =================================================
+            // RETURN CLOUDINARY URL
+            // =================================================
 
-            System.out.println(
-                    audioUrl
-            );
+            return cloudinaryAudioUrl;
 
-
-            return audioUrl;
 
         } catch (Exception e) {
+
+            // =================================================
+            // ERROR CLEANUP
+            // =================================================
+
+            try {
+
+                if (wavPath != null) {
+
+                    Files.deleteIfExists(
+                            wavPath
+                    );
+                }
+
+            } catch (Exception cleanupError) {
+
+                System.err.println(
+                        "⚠️ RESUME WAV CLEANUP FAILED: "
+                                + cleanupError.getMessage()
+                );
+            }
+
+
+            try {
+
+                if (mp3Path != null) {
+
+                    Files.deleteIfExists(
+                            mp3Path
+                    );
+                }
+
+            } catch (Exception cleanupError) {
+
+                System.err.println(
+                        "⚠️ RESUME MP3 CLEANUP FAILED: "
+                                + cleanupError.getMessage()
+                );
+            }
+
+
+            System.err.println(
+                    "========================================"
+            );
+
+            System.err.println(
+                    "❌ RESUME AUDIO GENERATION FAILED"
+            );
+
+            System.err.println(
+                    "MESSAGE: "
+                            + e.getMessage()
+            );
+
+            System.err.println(
+                    "========================================"
+            );
+
 
             throw new RuntimeException(
                     "Unable to generate Resume interview audio",
@@ -737,24 +990,28 @@ public class ResumeGroqTTService {
 
 
         return text
+
                 .replace(
                         "\n",
                         " "
                 )
+
                 .replace(
                         "\r",
                         " "
                 )
+
                 .replaceAll(
                         "\\s+",
                         " "
                 )
+
                 .trim();
     }
 
 
     // =========================================================
-    // DTO
+    // TTS REQUEST DTO
     // =========================================================
 
     private record GroqTTSRequest(

@@ -19,9 +19,18 @@ public class ConversationGroqSTTService {
 
     private final WebClient webClient;
 
+
+    // =========================================================
+    // GROQ API KEY
+    // =========================================================
+
     @Value("${GROQ_APIKEY}")
     private String apiKey;
 
+
+    // =========================================================
+    // GROQ STT
+    // =========================================================
 
     private static final String STT_URL =
             "https://api.groq.com/openai/v1/audio/transcriptions";
@@ -35,17 +44,27 @@ public class ConversationGroqSTTService {
     // RAW PCM -> WAV
     // =========================================================
 
-    private byte[] pcmToWav(byte[] pcmData) throws IOException {
+    private byte[] pcmToWav(
+            byte[] pcmData
+    ) throws IOException {
 
-        if (pcmData == null || pcmData.length == 0) {
+        if (
+                pcmData == null ||
+                        pcmData.length == 0
+        ) {
+
             throw new IllegalArgumentException(
                     "PCM audio is empty"
             );
         }
 
+
         int sampleRate = 16000;
+
         int channels = 1;
+
         int bitsPerSample = 16;
+
 
         int byteRate =
                 sampleRate
@@ -53,96 +72,152 @@ public class ConversationGroqSTTService {
                         * bitsPerSample
                         / 8;
 
+
         int blockAlign =
                 channels
                         * bitsPerSample
                         / 8;
 
-        int dataLength = pcmData.length;
+
+        int dataLength =
+                pcmData.length;
+
 
         int totalLength =
                 36 + dataLength;
+
 
         ByteArrayOutputStream output =
                 new ByteArrayOutputStream(
                         totalLength
                 );
 
+
+        // =====================================================
         // RIFF
-        output.write("RIFF".getBytes());
+        // =====================================================
+
+        output.write(
+                "RIFF".getBytes()
+        );
+
 
         writeIntLE(
                 output,
                 totalLength
         );
 
-        // WAVE
-        output.write("WAVE".getBytes());
 
-        // fmt
-        output.write("fmt ".getBytes());
+        // =====================================================
+        // WAVE
+        // =====================================================
+
+        output.write(
+                "WAVE".getBytes()
+        );
+
+
+        // =====================================================
+        // FMT
+        // =====================================================
+
+        output.write(
+                "fmt ".getBytes()
+        );
+
 
         writeIntLE(
                 output,
                 16
         );
 
-        // PCM format
+
+        // =====================================================
+        // PCM FORMAT
+        // =====================================================
+
         writeShortLE(
                 output,
                 (short) 1
         );
 
-        // channels
+
+        // =====================================================
+        // CHANNELS
+        // =====================================================
+
         writeShortLE(
                 output,
                 (short) channels
         );
 
-        // sample rate
+
+        // =====================================================
+        // SAMPLE RATE
+        // =====================================================
+
         writeIntLE(
                 output,
                 sampleRate
         );
 
-        // byte rate
+
+        // =====================================================
+        // BYTE RATE
+        // =====================================================
+
         writeIntLE(
                 output,
                 byteRate
         );
 
-        // block align
+
+        // =====================================================
+        // BLOCK ALIGN
+        // =====================================================
+
         writeShortLE(
                 output,
                 (short) blockAlign
         );
 
-        // bits per sample
+
+        // =====================================================
+        // BITS PER SAMPLE
+        // =====================================================
+
         writeShortLE(
                 output,
                 (short) bitsPerSample
         );
 
-        // data
+
+        // =====================================================
+        // DATA
+        // =====================================================
+
         output.write(
                 "data".getBytes()
         );
+
 
         writeIntLE(
                 output,
                 dataLength
         );
 
+
         output.write(
                 pcmData
         );
+
 
         return output.toByteArray();
     }
 
 
     // =========================================================
-    // LITTLE ENDIAN HELPERS
+    // LITTLE ENDIAN - INT
     // =========================================================
 
     private void writeIntLE(
@@ -167,6 +242,10 @@ public class ConversationGroqSTTService {
         );
     }
 
+
+    // =========================================================
+    // LITTLE ENDIAN - SHORT
+    // =========================================================
 
     private void writeShortLE(
             ByteArrayOutputStream output,
@@ -203,8 +282,27 @@ public class ConversationGroqSTTService {
 
             System.out.println(
                     "RAW PCM BYTES: "
-                            + pcmData.length
+                            + (
+                            pcmData == null
+                                    ? 0
+                                    : pcmData.length
+                    )
             );
+
+
+            // =================================================
+            // VALIDATE PCM
+            // =================================================
+
+            if (
+                    pcmData == null ||
+                            pcmData.length == 0
+            ) {
+
+                throw new IllegalArgumentException(
+                        "PCM audio is empty"
+                );
+            }
 
 
             // =================================================
@@ -238,6 +336,7 @@ public class ConversationGroqSTTService {
 
                         @Override
                         public String getFilename() {
+
                             return "conversation.wav";
                         }
                     };
@@ -287,50 +386,76 @@ public class ConversationGroqSTTService {
 
             String response =
                     webClient
+
                             .post()
+
                             .uri(
                                     STT_URL
                             )
+
                             .header(
                                     "Authorization",
                                     "Bearer " + apiKey
                             )
+
                             .contentType(
                                     MediaType.MULTIPART_FORM_DATA
                             )
+
                             .body(
                                     BodyInserters
                                             .fromMultipartData(
                                                     formData
                                             )
                             )
+
                             .retrieve()
+
+                            // =================================
+                            // GROQ ERROR
+                            // =================================
+
                             .onStatus(
+
                                     status ->
                                             status.isError(),
 
                                     clientResponse ->
+
                                             clientResponse
                                                     .bodyToMono(
                                                             String.class
                                                     )
+
                                                     .flatMap(
                                                             errorBody ->
-                                                                    reactor.core.publisher.Mono.error(
-                                                                            new RuntimeException(
-                                                                                    "Groq STT HTTP "
-                                                                                            + clientResponse.statusCode()
-                                                                                            + ": "
-                                                                                            + errorBody
+
+                                                                    reactor.core.publisher.Mono
+                                                                            .error(
+                                                                                    new RuntimeException(
+                                                                                            "Groq STT HTTP "
+                                                                                                    + clientResponse.statusCode()
+                                                                                                    + ": "
+                                                                                                    + errorBody
+                                                                                    )
                                                                             )
-                                                                    )
                                                     )
                             )
+
+                            // =================================
+                            // RESPONSE
+                            // =================================
+
                             .bodyToMono(
                                     String.class
                             )
+
                             .block();
 
+
+            // =================================================
+            // LOG RESPONSE
+            // =================================================
 
             System.out.println(
                     "✅ GROQ STT RESPONSE:"
@@ -346,7 +471,7 @@ public class ConversationGroqSTTService {
 
 
             // =================================================
-            // EXTRACT TEXT
+            // EMPTY RESPONSE
             // =================================================
 
             if (
@@ -358,19 +483,39 @@ public class ConversationGroqSTTService {
             }
 
 
+            // =================================================
+            // EXTRACT TEXT
+            // =================================================
+
             try {
 
                 com.fasterxml.jackson.databind.JsonNode node =
+
                         new com.fasterxml.jackson.databind.ObjectMapper()
                                 .readTree(
                                         response
                                 );
 
-                return node
-                        .path("text")
-                        .asText(
-                                ""
-                        );
+
+                String text =
+                        node
+                                .path("text")
+                                .asText(
+                                        ""
+                                );
+
+
+                System.out.println(
+                        "📝 TRANSCRIBED TEXT:"
+                );
+
+                System.out.println(
+                        text
+                );
+
+
+                return text;
+
 
             } catch (Exception jsonError) {
 
@@ -378,6 +523,7 @@ public class ConversationGroqSTTService {
                         "⚠️ STT JSON PARSE ERROR: "
                                 + jsonError.getMessage()
                 );
+
 
                 return response;
             }
@@ -389,6 +535,7 @@ public class ConversationGroqSTTService {
                     "❌ CONVERSATION GROQ STT ERROR: "
                             + error.getMessage()
             );
+
 
             throw new RuntimeException(
                     error

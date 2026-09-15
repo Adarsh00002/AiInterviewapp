@@ -1,4 +1,4 @@
-package com.example.MyFirstApp.config;
+/*package com.example.MyFirstApp.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -21,4 +21,4 @@ public class conversationAudioResourceConfig
                         "file:uploads/conversation/audio/"
                 );
     }
-}
+}*/
